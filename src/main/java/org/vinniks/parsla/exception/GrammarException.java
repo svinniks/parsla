@@ -1,0 +1,7 @@
+package org.vinniks.parsla.exception;
+
+public class GrammarException extends RuntimeException {
+    public GrammarException(String message) {
+        super(message);
+    }
+}
