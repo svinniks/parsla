@@ -1,4 +1,4 @@
 package org.vinniks.parsla.parser;
 
-public class NoActionListener implements ParserOutputListener {
+public class NoActionListener<P> implements ParserOutputListener<P> {
 }

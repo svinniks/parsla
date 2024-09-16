@@ -4,11 +4,13 @@ import lombok.AccessLevel;
 import lombok.Getter;
 
 @Getter(AccessLevel.PACKAGE)
-final class RuleParseTreeNode extends AbstractParseTreeNode<CompiledRuleItem> {
+final class RuleParseTreeNode<P> extends AbstractParseTreeNode<CompiledRuleItem, P> {
     private final boolean outputOption;
 
-    RuleParseTreeNode(AbstractParseTreeNode<?> parent, int level, CompiledRuleItem item, boolean outputOption) {
-        super(parent, level, item);
+    RuleParseTreeNode(
+        AbstractParseTreeNode<?, P> parent, int level, CompiledRuleItem item, P position, boolean outputOption
+    ) {
+        super(parent, level, item, position);
         this.outputOption = outputOption;
     }
 }

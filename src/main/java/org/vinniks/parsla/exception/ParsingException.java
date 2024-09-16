@@ -1,11 +1,15 @@
 package org.vinniks.parsla.exception;
 
-public class ParsingException extends RuntimeException {
-    public ParsingException(String message) {
-        super(message);
+public final class ParsingException extends ParslaException {
+    private final Object position;
+
+    public ParsingException(String message, Object position) {
+        super(message + (position == null ? "" : " at " + position));
+        this.position = position;
     }
 
-    public ParsingException(String message, Throwable cause) {
-        super(message, cause);
+    @SuppressWarnings("unchecked")
+    public <T> T getPosition() {
+        return (T) position;
     }
 }

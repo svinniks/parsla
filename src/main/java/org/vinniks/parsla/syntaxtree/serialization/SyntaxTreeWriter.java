@@ -6,5 +6,5 @@ import java.io.IOException;
 import java.io.Writer;
 
 public interface SyntaxTreeWriter {
-    void write(SyntaxTreeNode syntaxTreeNode, Writer writer) throws IOException;
+    void write(SyntaxTreeNode<?> syntaxTreeNode, Writer writer) throws IOException;
 }

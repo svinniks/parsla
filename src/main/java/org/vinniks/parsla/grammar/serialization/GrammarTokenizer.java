@@ -1,18 +1,15 @@
 package org.vinniks.parsla.grammar.serialization;
 
-import lombok.RequiredArgsConstructor;
+import lombok.Getter;
+import lombok.NonNull;
 import org.vinniks.parsla.exception.ParsingException;
-import org.vinniks.parsla.tokenizer.SimpleToken;
 import org.vinniks.parsla.tokenizer.Token;
-import org.vinniks.parsla.tokenizer.TokenIterator;
-import org.vinniks.parsla.tokenizer.tokenizers.AbstractBufferedTextTokenIterator;
-import org.vinniks.parsla.tokenizer.tokenizers.AbstractBufferedTextTokenizer;
+import org.vinniks.parsla.tokenizer.text.AbstractTextTokenIterator;
+import org.vinniks.parsla.tokenizer.text.CharacterIterator;
+import org.vinniks.parsla.tokenizer.text.TextPosition;
+import org.vinniks.parsla.tokenizer.text.buffered.AbstractBufferedTextTokenizer;
+import org.vinniks.parsla.tokenizer.text.buffered.CharacterBufferProvider;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.stream.Stream;
-
-@RequiredArgsConstructor
 public final class GrammarTokenizer extends AbstractBufferedTextTokenizer {
     // Standard
     private static final String IDENTIFIER = "identifier";
@@ -24,71 +21,53 @@ public final class GrammarTokenizer extends AbstractBufferedTextTokenizer {
     private static final String COMMA = "comma";
     private static final String STRING = "string";
     private static final String SEMICOLON = "semicolon";
-    private static final String EMPTY = "empty";
+    private static final String CARET = "caret";
 
-    private static final Token COLON_TOKEN = new SimpleToken(COLON);
-    private static final Token GT_TOKEN = new SimpleToken(GT);
-    private static final Token LEFT_CURLY_BRACKET_TOKEN = new SimpleToken(LEFT_CURLY_BRACKET);
-    private static final Token RIGHT_CURLY_BRACKET_TOKEN = new SimpleToken(RIGHT_CURLY_BRACKET);
-    private static final Token EXCLAMATION_TOKEN = new SimpleToken(EXCLAMATION);
-    private static final Token COMMA_TOKEN = new SimpleToken(COMMA);
-    private static final Token SEMICOLON_TOKEN = new SimpleToken(SEMICOLON);
-    private static final Token EMPTY_TOKEN = new SimpleToken(EMPTY);
+    private static final Token COLON_TOKEN = new Token(COLON);
+    private static final Token GT_TOKEN = new Token(GT);
+    private static final Token LEFT_CURLY_BRACKET_TOKEN = new Token(LEFT_CURLY_BRACKET);
+    private static final Token RIGHT_CURLY_BRACKET_TOKEN = new Token(RIGHT_CURLY_BRACKET);
+    private static final Token EXCLAMATION_TOKEN = new Token(EXCLAMATION);
+    private static final Token COMMA_TOKEN = new Token(COMMA);
+    private static final Token SEMICOLON_TOKEN = new Token(SEMICOLON);
+    private static final Token CARET_TOKEN = new Token(CARET);
 
     // Extended
     private static final String LEFT_BRACKET = "left-bracket";
     private static final String RIGHT_BRACKET = "right-bracket";
     private static final String PLUS = "plus";
     private static final String ASTERISK = "asterisk";
-    private static final String QUESTION_MARK = "question-mark";
+    private static final String QUESTION = "question";
     private static final String PIPE = "pipe";
 
-    private static final Token LEFT_BRACKET_TOKEN = new SimpleToken(LEFT_BRACKET);
-    private static final Token RIGHT_BRACKET_TOKEN = new SimpleToken(RIGHT_BRACKET);
-    private static final Token PLUS_TOKEN = new SimpleToken(PLUS);
-    private static final Token ASTERISK_TOKEN = new SimpleToken(ASTERISK);
-    private static final Token QUESTION_MARK_TOKEN = new SimpleToken(QUESTION_MARK);
-    private static final Token PIPE_TOKEN = new SimpleToken(PIPE);
+    private static final Token LEFT_BRACKET_TOKEN = new Token(LEFT_BRACKET);
+    private static final Token RIGHT_BRACKET_TOKEN = new Token(RIGHT_BRACKET);
+    private static final Token PLUS_TOKEN = new Token(PLUS);
+    private static final Token ASTERISK_TOKEN = new Token(ASTERISK);
+    private static final Token QUESTION_MARK_TOKEN = new Token(QUESTION);
+    private static final Token PIPE_TOKEN = new Token(PIPE);
 
-    private static final Collection<String> STANDARD_TOKEN_TYPES = List.of(
-        IDENTIFIER,
-        COLON,
-        GT,
-        LEFT_CURLY_BRACKET,
-        RIGHT_CURLY_BRACKET,
-        COMMA,
-        STRING,
-        SEMICOLON,
-        EMPTY
-    );
-
-    private static final Iterable<String> EXTENDED_TOKEN_TYPES = Stream
-        .concat(
-            STANDARD_TOKEN_TYPES.stream(),
-            Stream.of(
-                LEFT_BRACKET,
-                RIGHT_BRACKET,
-                PLUS,
-                ASTERISK,
-                QUESTION_MARK,
-                PIPE
-            )
-        )
-        .toList();
-
+    @Getter
     private final boolean extended;
 
-    @Override
-    public Iterable<String> getTokenTypes() {
-        return extended ? EXTENDED_TOKEN_TYPES : STANDARD_TOKEN_TYPES;
+    private final IdentifierCharacterValidator identifierCharacterValidator;
+
+    GrammarTokenizer(
+        boolean extended,
+        @NonNull IdentifierCharacterValidator identifierCharacterValidator,
+        CharacterBufferProvider characterBufferProvider
+    ) {
+        super(characterBufferProvider);
+        this.extended = extended;
+        this.identifierCharacterValidator = identifierCharacterValidator;
     }
 
     @Override
-    protected TokenIterator getTokenIterator(CharacterIterator characterIterator) {
+    public AbstractTextTokenIterator getTokenIterator(CharacterIterator characterIterator) {
         return new GrammarTokenIterator(characterIterator, extended);
     }
 
-    private static class GrammarTokenIterator extends AbstractBufferedTextTokenIterator {
+    private class GrammarTokenIterator extends AbstractTextTokenIterator {
         private enum State {
             LF_TOKEN,
             R_IDENTIFIER,
@@ -96,18 +75,23 @@ public final class GrammarTokenizer extends AbstractBufferedTextTokenizer {
             LF_COMMENT_START,
             R_SHORT_COMMENT,
             R_LONG_COMMENT,
-            LF_LONG_COMMENT_END
+            LF_LONG_COMMENT_END,
+            LF_ESCAPED_CHARACTER,
+            R_UNICODE_CHARACTER_CODE
         }
 
         private final boolean extended;
         private State state;
         private final StringBuilder valueBuilder;
+        private final StringBuilder characterCodeBuilder;
+        private TextPosition tokenPosition;
 
         private GrammarTokenIterator(CharacterIterator characterIterator, boolean extended) {
             super(characterIterator);
             this.extended = extended;
             state = State.LF_TOKEN;
             valueBuilder = new StringBuilder();
+            characterCodeBuilder = new StringBuilder();
         }
 
         @Override
@@ -126,84 +110,100 @@ public final class GrammarTokenizer extends AbstractBufferedTextTokenizer {
                 rLongComment(c);
             } else if (state == State.LF_LONG_COMMENT_END) {
                 lfLongCommentEnd(c);
+            } else if (state == State.LF_ESCAPED_CHARACTER) {
+                lfEscapedCharacter(c);
+            } else  {
+                //State.R_UNICODE_CHARACTER_CODE
+                rUnicodeCharacterCode(c);
             }
         }
 
         @Override
         protected void end() {
             if (state == State.R_IDENTIFIER) {
-                push(new SimpleToken(IDENTIFIER, valueBuilder.toString()));
-            } else if (state == State.R_LONG_COMMENT || state == State.LF_LONG_COMMENT_END || state == State.R_STRING) {
-                throw new ParsingException("Unexpected end of the input");
+                push(new Token(IDENTIFIER, valueBuilder.toString()), tokenPosition);
+            } else if (
+                state == State.R_LONG_COMMENT
+                || state == State.LF_COMMENT_START
+                || state == State.LF_LONG_COMMENT_END
+                || state == State.R_STRING
+                || state == State.R_UNICODE_CHARACTER_CODE
+            ) {
+                throw new ParsingException("unexpected end of the input", characterPosition());
             }
         }
 
         private void lfToken(char c) {
-            if (c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z') {
+            if (isValidFirstIdentifierCharacter(c)) {
                 valueBuilder.setLength(0);
                 valueBuilder.append(c);
                 state = State.R_IDENTIFIER;
+                tokenPosition = characterPosition();
             } else if (c == ':') {
-                push(COLON_TOKEN);
+                push(COLON_TOKEN, characterPosition());
             } else if (c == '>') {
-                push(GT_TOKEN);
+                push(GT_TOKEN, characterPosition());
             } else if (c == '{') {
-                push(LEFT_CURLY_BRACKET_TOKEN);
+                push(LEFT_CURLY_BRACKET_TOKEN, characterPosition());
             } else if (c == '}') {
-                push(RIGHT_CURLY_BRACKET_TOKEN);
+                push(RIGHT_CURLY_BRACKET_TOKEN, characterPosition());
             } else if (c == '!') {
-                push(EXCLAMATION_TOKEN);
+                push(EXCLAMATION_TOKEN, characterPosition());
             } else if (c == ',') {
-                push(COMMA_TOKEN);
+                push(COMMA_TOKEN, characterPosition());
             } else if (c == '"') {
                 valueBuilder.setLength(0);
                 state = State.R_STRING;
+                tokenPosition = characterPosition();
             } else if (c == ';') {
-                push(SEMICOLON_TOKEN);
+                push(SEMICOLON_TOKEN, characterPosition());
             } else if (c == '^') {
-                push(EMPTY_TOKEN);
+                push(CARET_TOKEN, characterPosition());
             } else if (c == '/') {
                 state = State.LF_COMMENT_START;
             } else if (extended) {
                 lfExtendedToken(c);
             } else if (!Character.isWhitespace(c)) {
-                throwUnexpectedCharacter(c);
+                throw unexpectedCharacter(c);
             }
         }
 
         private void lfExtendedToken(char c) {
             if (c == '(') {
-                push(LEFT_BRACKET_TOKEN);
+                push(LEFT_BRACKET_TOKEN, characterPosition());
             } else if (c == ')') {
-                push(RIGHT_BRACKET_TOKEN);
+                push(RIGHT_BRACKET_TOKEN, characterPosition());
             } else if (c == '+') {
-                push(PLUS_TOKEN);
+                push(PLUS_TOKEN, characterPosition());
             } else if (c == '*') {
-                push(ASTERISK_TOKEN);
+                push(ASTERISK_TOKEN, characterPosition());
             } else if (c == '?') {
-                push(QUESTION_MARK_TOKEN);
+                push(QUESTION_MARK_TOKEN, characterPosition());
             } else if (c == '|') {
-                push(PIPE_TOKEN);
+                push(PIPE_TOKEN, characterPosition());
             } else if (!Character.isWhitespace(c)) {
-                throwUnexpectedCharacter(c);
+                throw unexpectedCharacter(c);
             }
         }
 
         private void rIdentifier(char c) {
-            if (c == '-' || c == '_' || c >= '0' && c <= '9' || c >= 'A' && c < 'Z' || c >= 'a' && c <= 'z') {
+            if (isValidNextIdentifierCharacter(c)) {
                 valueBuilder.append(c);
             } else {
                 var value = valueBuilder.toString();
+                var position = tokenPosition;
                 state = State.LF_TOKEN;
                 lfToken(c);
-                push(new SimpleToken(IDENTIFIER, value));
+                push(new Token(IDENTIFIER, value), position);
             }
         }
 
         private void rString(char c) {
             if (c == '"') {
-                push(new SimpleToken(STRING, valueBuilder.toString()));
+                push(new Token(STRING, valueBuilder.toString()), tokenPosition);
                 state = State.LF_TOKEN;
+            } else if (c == '\\') {
+                state = State.LF_ESCAPED_CHARACTER;
             } else {
                 valueBuilder.append(c);
             }
@@ -215,7 +215,7 @@ public final class GrammarTokenizer extends AbstractBufferedTextTokenizer {
             } else if (c == '*') {
                 state = State.R_LONG_COMMENT;
             } else {
-                throwUnexpectedCharacter(c);
+                throw unexpectedCharacter(c);
             }
         }
 
@@ -239,8 +239,68 @@ public final class GrammarTokenizer extends AbstractBufferedTextTokenizer {
             }
         }
 
-        private void throwUnexpectedCharacter(char c) {
-            throw new ParsingException(String.format("Unexpected character %s", c));
+        private void lfEscapedCharacter(char c) {
+            if (c == 't') {
+                valueBuilder.append('\t');
+                state = State.R_STRING;
+            } else if (c == 'b') {
+                valueBuilder.append('\b');
+                state = State.R_STRING;
+            } else if (c == 'n') {
+                valueBuilder.append('\n');
+                state = State.R_STRING;
+            } else if (c == 'r') {
+                valueBuilder.append('\r');
+                state = State.R_STRING;
+            } else if (c == 'f') {
+                valueBuilder.append('\f');
+                state = State.R_STRING;
+            } else if (c == '\'') {
+                valueBuilder.append('\'');
+                state = State.R_STRING;
+            } else if (c == '"') {
+                valueBuilder.append('"');
+                state = State.R_STRING;
+            } else if (c == '\\') {
+                valueBuilder.append('\\');
+                state = State.R_STRING;
+            } else if (c == 'u') {
+                characterCodeBuilder.setLength(0);
+                state = State.R_UNICODE_CHARACTER_CODE;
+            } else {
+                throw new ParsingException(String.format("invalid escape character %s", c), characterPosition());
+            }
+        }
+
+        private void rUnicodeCharacterCode(char c) {
+            if (c >= 'A' && c <= 'F' || c >= 'a' && c <= 'f' || c >= '0' && c <= '9') {
+                characterCodeBuilder.append(c);
+
+                if (characterCodeBuilder.length() == 4) {
+                    valueBuilder.append((char) Integer.parseInt(characterCodeBuilder.toString(), 16));
+                    state = State.R_STRING;
+                }
+            } else {
+                throw new ParsingException(String.format("invalid hexadecimal digit %s in character code", c), characterPosition());
+            }
+        }
+
+        private boolean isValidFirstIdentifierCharacter(char c) {
+            return identifierCharacterValidator.isValidFirstCharacter(c) && !isReservedCharacter(c);
+        }
+
+        private boolean isValidNextIdentifierCharacter(char c) {
+            return identifierCharacterValidator.isValidNextCharacter(c) && !isReservedCharacter(c);
+        }
+
+        @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+        private boolean isReservedCharacter(char c) {
+            return Character.isWhitespace(c) || c == '{' || c == '}' || c == '"' || c == '>' || c == ',' || c == ';' || c == ':' || c == '!'
+                || extended && (c == '(' || c == ')' || c == '?' || c == '+' || c == '*' || c == '|');
+        }
+
+        private ParsingException unexpectedCharacter(char c) {
+            return new ParsingException(String.format("unexpected character %s", c), characterPosition());
         }
     }
 }

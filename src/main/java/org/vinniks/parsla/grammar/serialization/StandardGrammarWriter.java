@@ -1,18 +1,29 @@
 package org.vinniks.parsla.grammar.serialization;
 
-import org.vinniks.parsla.grammar.*;
+import lombok.NonNull;
+import org.vinniks.parsla.grammar.Grammar;
+import org.vinniks.parsla.grammar.Item;
+import org.vinniks.parsla.grammar.Option;
+import org.vinniks.parsla.grammar.RuleItem;
+import org.vinniks.parsla.grammar.TokenItem;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Optional;
 
-public class StandardGrammarWriter implements GrammarWriter {
+public final class StandardGrammarWriter implements GrammarWriter {
+    private static final StandardGrammarWriter INSTANCE = new StandardGrammarWriter();
+
+    public static StandardGrammarWriter instance() {
+        return INSTANCE;
+    }
+
     @Override
-    public void write(Grammar grammar, Writer writer) throws IOException {
+    public void write(@NonNull Grammar grammar, @NonNull Writer writer) throws IOException {
         String ruleName = null;
 
         for (var option : grammar.getOptions()) {
-            if (!option.getRuleName().equals(ruleName)) {
+            if (ruleName != null && !option.getRuleName().equals(ruleName)) {
                 writer.append('\n');
             }
 
@@ -47,7 +58,9 @@ public class StandardGrammarWriter implements GrammarWriter {
             writer
                 .append(ruleItem.isOutput() ? ">" : "")
                 .append(ruleItem.getRuleName());
-        } else if (item instanceof TokenItem tokenItem) {
+        } else {
+            var tokenItem = (TokenItem) item;
+
             writer
                 .append('{')
                 .append(tokenItem.isOutputType() ? ">" : "")

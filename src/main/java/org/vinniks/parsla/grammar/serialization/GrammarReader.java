@@ -1,5 +1,6 @@
 package org.vinniks.parsla.grammar.serialization;
 
+import lombok.NonNull;
 import lombok.SneakyThrows;
 import org.vinniks.parsla.grammar.Grammar;
 
@@ -11,7 +12,7 @@ public interface GrammarReader {
     Grammar read(Reader source) throws IOException;
 
     @SneakyThrows
-    default Grammar read(String source) {
+    default Grammar read(@NonNull String source) {
         try (var reader = new StringReader(source)) {
             return read(reader);
         }

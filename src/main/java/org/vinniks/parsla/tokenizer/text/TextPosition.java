@@ -1,4 +1,4 @@
-package org.vinniks.parsla.tokenizer;
+package org.vinniks.parsla.tokenizer.text;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -8,10 +8,9 @@ import lombok.RequiredArgsConstructor;
 public class TextPosition {
     private final int line;
     private final int column;
-    private final int length;
 
     @Override
     public String toString() {
-        return "(" + line + ", " + column + ")";
+        return line + ":" + column;
     }
 }

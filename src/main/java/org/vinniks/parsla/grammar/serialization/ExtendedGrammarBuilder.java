@@ -4,21 +4,29 @@ import org.vinniks.parsla.grammar.Grammar;
 import org.vinniks.parsla.grammar.Item;
 import org.vinniks.parsla.grammar.Option;
 import org.vinniks.parsla.syntaxtree.SyntaxTreeNode;
+import org.vinniks.parsla.tokenizer.text.TextPosition;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static org.vinniks.parsla.grammar.GrammarBuilder.*;
+import static org.vinniks.parsla.grammar.GrammarBuilder.grammar;
+import static org.vinniks.parsla.grammar.GrammarBuilder.option;
+import static org.vinniks.parsla.grammar.GrammarBuilder.rule;
+import static org.vinniks.parsla.grammar.GrammarBuilder.token;
 
 class ExtendedGrammarBuilder {
-    static Grammar build(SyntaxTreeNode syntaxTree) {
+    static Grammar build(SyntaxTreeNode<TextPosition> syntaxTree) {
         return new ExtendedGrammarBuilder(syntaxTree).build();
     }
 
-    private final SyntaxTreeNode syntaxTree;
+    private final SyntaxTreeNode<TextPosition> syntaxTree;
     private final Collection<Option> options;
     private final Map<String, Integer> subOptionCounters;
 
-    private ExtendedGrammarBuilder(SyntaxTreeNode syntaxTree) {
+    private ExtendedGrammarBuilder(SyntaxTreeNode<TextPosition> syntaxTree) {
         this.syntaxTree = syntaxTree;
         options = new ArrayList<>();
         subOptionCounters = new HashMap<>();
@@ -29,7 +37,7 @@ class ExtendedGrammarBuilder {
         return grammar(options);
     }
 
-    private void buildOption(SyntaxTreeNode optionNode) {
+    private void buildOption(SyntaxTreeNode<TextPosition> optionNode) {
         var ruleName = optionNode.singular("rule-name");
         var output = optionNode.hasChild("output");
 
@@ -41,8 +49,8 @@ class ExtendedGrammarBuilder {
             .forEach(options::add);
     }
 
-    private Option buildSequence(String ruleName, boolean output, SyntaxTreeNode sequenceNode) {
-        return sequenceNode.valueIs("empty")
+    private Option buildSequence(String ruleName, boolean output, SyntaxTreeNode<TextPosition> sequenceNode) {
+        return sequenceNode.valueIs("caret")
             ? option(ruleName, output)
             : option(
                 ruleName,
@@ -52,10 +60,10 @@ class ExtendedGrammarBuilder {
                     .stream()
                     .map(itemNode -> buildItem(ruleName, itemNode))
                     .toList()
-        );
+            );
     }
 
-    private Item buildItem(String ruleName, SyntaxTreeNode itemNode) {
+    private Item buildItem(String ruleName, SyntaxTreeNode<TextPosition> itemNode) {
         var quantifier = itemNode.optionalSingular("quantifier").orElse("one");
         var item = buildBody(ruleName, itemNode.child("body"));
 
@@ -86,7 +94,7 @@ class ExtendedGrammarBuilder {
         }
     }
 
-    private Item buildBody(String ruleName, SyntaxTreeNode bodyNode) {
+    private Item buildBody(String ruleName, SyntaxTreeNode<TextPosition> bodyNode) {
         var contentNode = bodyNode.child();
 
         if (contentNode.valueIs("token")) {

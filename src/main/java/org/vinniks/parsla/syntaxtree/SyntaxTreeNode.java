@@ -1,6 +1,6 @@
 package org.vinniks.parsla.syntaxtree;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.vinniks.parsla.exception.SyntaxTreeException;
 import org.vinniks.parsla.syntaxtree.serialization.DefaultSyntaxTreeWriter;
@@ -9,16 +9,22 @@ import java.io.StringWriter;
 import java.util.List;
 import java.util.Optional;
 
-@AllArgsConstructor
-public class SyntaxTreeNode {
+@SuppressWarnings("unused")
+@RequiredArgsConstructor
+public class SyntaxTreeNode<P> {
+    private final P position;
     private final String value;
-    List<SyntaxTreeNode> children;
+    private final List<SyntaxTreeNode<P>> children;
+
+    public P position() {
+        return position;
+    }
 
     public String value() {
         return value;
     }
 
-    public List<SyntaxTreeNode> children() {
+    public List<SyntaxTreeNode<P>> children() {
         return children;
     }
 
@@ -26,7 +32,7 @@ public class SyntaxTreeNode {
     @SneakyThrows
     public String toString() {
         try (var writer = new StringWriter()) {
-            new DefaultSyntaxTreeWriter().write(this, writer);
+            new DefaultSyntaxTreeWriter(true).write(this, writer);
             return writer.toString();
         }
     }
@@ -35,14 +41,14 @@ public class SyntaxTreeNode {
         return this.value.equals(value);
     }
 
-    public Optional<SyntaxTreeNode> optionalChild(String childValue) {
+    public Optional<SyntaxTreeNode<P>> optionalChild(String childValue) {
         var matchingChildren = children
             .stream()
             .filter(childNode -> childNode.value.equals(childValue))
             .toList();
 
         if (matchingChildren.size() > 1) {
-            throw new SyntaxTreeException(String.format("%s has multiple %s!", value, childValue));
+            throw new SyntaxTreeException(String.format("%s has multiple %s", value, childValue));
         } else {
             return matchingChildren.stream().findFirst();
         }
@@ -52,23 +58,23 @@ public class SyntaxTreeNode {
         return optionalChild(childValue).isPresent();
     }
 
-    public SyntaxTreeNode child(String childValue) {
+    public SyntaxTreeNode<P> child(String childValue) {
         return optionalChild(childValue).orElseThrow(
-            () -> new SyntaxTreeException(String.format("%s does not contain %s!", value, childValue))
+            () -> new SyntaxTreeException(String.format("%s does not contain %s", value, childValue))
         );
     }
 
-    public Optional<SyntaxTreeNode> optionalChild() {
+    public Optional<SyntaxTreeNode<P>> optionalChild() {
         if (children.size() > 1) {
-            throw new SyntaxTreeException(String.format("%s has multiple children!", value));
+            throw new SyntaxTreeException(String.format("%s has multiple children", value));
         } else {
             return children.stream().findFirst();
         }
     }
 
-    public SyntaxTreeNode child() {
-        return  optionalChild().orElseThrow(
-            () -> new SyntaxTreeException(String.format("%s does not have children!", value))
+    public SyntaxTreeNode<P> child() {
+        return optionalChild().orElseThrow(
+            () -> new SyntaxTreeException(String.format("%s does not have children", value))
         );
     }
 

@@ -1,29 +1,38 @@
 package org.vinniks.parsla.grammar.serialization;
 
+import org.vinniks.parsla.exception.GrammarException;
+import org.vinniks.parsla.exception.ParsingException;
 import org.vinniks.parsla.grammar.Grammar;
-import org.vinniks.parsla.grammar.Item;
-import org.vinniks.parsla.grammar.Option;
-import org.vinniks.parsla.parser.Parser;
-import org.vinniks.parsla.parser.TextParser;
-import org.vinniks.parsla.syntaxtree.SyntaxTreeNode;
+import org.vinniks.parsla.parser.text.TextParser;
+import org.vinniks.parsla.tokenizer.text.buffered.CharacterBufferProvider;
 
 import java.io.IOException;
 import java.io.Reader;
 
-import static org.vinniks.parsla.grammar.GrammarBuilder.*;
+import static org.vinniks.parsla.grammar.GrammarBuilder.grammar;
+import static org.vinniks.parsla.grammar.GrammarBuilder.items;
+import static org.vinniks.parsla.grammar.GrammarBuilder.option;
+import static org.vinniks.parsla.grammar.GrammarBuilder.options;
+import static org.vinniks.parsla.grammar.GrammarBuilder.rule;
+import static org.vinniks.parsla.grammar.GrammarBuilder.token;
 
-public class StandardGrammarReader implements GrammarReader {
-    private static final TextParser PARSER;
+public final class StandardGrammarReader implements GrammarReader {
+    private static final int DEFAULT_CHARACTER_BUFFER_SIZE = 8 * 1024;
+    private static final StandardGrammarReader INSTANCE = new StandardGrammarReader(() -> new char[DEFAULT_CHARACTER_BUFFER_SIZE]);
 
-    static {
-        var grammar = grammar(options(
+    public static StandardGrammarReader instance() {
+        return INSTANCE;
+    }
+
+    public static Grammar grammarGrammar() {
+        return grammar(options(
             option("options"),
             option("options", items(rule("option"), rule("options"))),
             option("option", true, items(rule("output"), rule("rule-name", true), token("colon"), rule("items", true), token("semicolon"))),
             option("output"),
             option("output", true, items(token("gt"))),
             option("rule-name", items(token("identifier", false, true))),
-            option("items", items(token("empty"))),
+            option("items", items(token("caret"))),
             option("items", items(rule("item"), rule("items-tail"))),
             option("items-tail"),
             option("items-tail", items(rule("item"), rule("items-tail"))),
@@ -47,51 +56,28 @@ public class StandardGrammarReader implements GrammarReader {
             option("rule", true, items(rule("output"), rule("name", true))),
             option("name", items(token("identifier", false, true)))
         ));
+    }
 
-        PARSER = new TextParser(grammar, new GrammarTokenizer(false));
+    private final TextParser parser;
+
+    public StandardGrammarReader(CharacterBufferProvider characterBufferProvider) {
+        parser = new TextParser(
+            grammarGrammar(),
+            new GrammarTokenizer(
+                false,
+                new StandardIdentifierCharacterValidator(),
+                characterBufferProvider
+            )
+        );
     }
 
     @Override
     public Grammar read(Reader reader) throws IOException {
-        var syntaxTree = PARSER.parse(reader, "options");
-        return buildGrammar(syntaxTree);
-    }
-
-    public Parser getParser() {
-        return PARSER;
-    }
-
-    private Grammar buildGrammar(SyntaxTreeNode rootNode) {
-        return grammar(rootNode
-            .children()
-            .stream()
-            .map(this::buildOption)
-            .toList()
-        );
-    }
-
-    private Option buildOption(SyntaxTreeNode optionNode) {
-        return option(
-            optionNode.singular("rule-name"),
-            optionNode.hasChild("output"),
-            optionNode
-                .child("items")
-                .children()
-                .stream()
-                .map(this::buildItem)
-                .toList()
-        );
-    }
-
-    private Item buildItem(SyntaxTreeNode itemNode) {
-        return itemNode.valueIs("rule")
-            ? rule(itemNode.singular("name"), itemNode.hasChild("output"))
-            : token(
-                itemNode.child("elevations").children().size(),
-                itemNode.optionalSingular("type").orElse(null),
-                itemNode.hasChild("output-type"),
-                itemNode.optionalSingular("value").orElse(null),
-                itemNode.hasChild("output-value")
-            );
+        try {
+            var syntaxTree = parser.parse(reader, "options");
+            return StandardGrammarBuilder.build(syntaxTree);
+        } catch (ParsingException e) {
+            throw new GrammarException("failed to read standard grammar", e);
+        }
     }
 }

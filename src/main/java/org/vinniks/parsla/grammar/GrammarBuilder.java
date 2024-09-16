@@ -1,9 +1,13 @@
 package org.vinniks.parsla.grammar;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class GrammarBuilder {
     public static Option option(String ruleName, boolean output, Iterable<Item> items) {
         return new Option(ruleName, output, items);
@@ -21,36 +25,44 @@ public class GrammarBuilder {
         return option(ruleName, false);
     }
 
-    public static Item rule(String ruleName, boolean output) {
+    public static RuleItem rule(String ruleName, boolean output) {
         return new RuleItem(ruleName, output);
     }
 
-    public static Item rule(String ruleName) {
+    public static RuleItem rule(String ruleName) {
         return rule(ruleName, false);
     }
 
-    public static Item token(int elevation, String tokenType, boolean outputType, String tokenValue, boolean outputValue) {
+    public static TokenItem token(int elevation, String tokenType, boolean outputType, String tokenValue, boolean outputValue) {
         return new TokenItem(elevation, tokenType, outputType, tokenValue, outputValue);
     }
 
-    public static Item token(int elevation, String tokenType, boolean outputType, boolean outputValue) {
+    public static TokenItem token(int elevation, String tokenType, boolean outputType, boolean outputValue) {
         return token(elevation, tokenType, outputType, null, outputValue);
     }
 
-    public static Item token(int elevation, String tokenType) {
+    public static TokenItem token(int elevation, String tokenType) {
         return token(elevation, tokenType, false, false);
     }
 
-    public static Item token(String tokenType, boolean outputType, String tokenValue, boolean outputValue) {
+    public static TokenItem token(int elevation) {
+        return token(elevation, null, false, false);
+    }
+
+    public static TokenItem token(String tokenType, boolean outputType, String tokenValue, boolean outputValue) {
         return token(0, tokenType, outputType, tokenValue, outputValue);
     }
 
-    public static Item token(String tokenType, boolean outputType, boolean outputValue) {
+    public static TokenItem token(String tokenType, boolean outputType, boolean outputValue) {
         return token(tokenType, outputType, null, outputValue);
     }
 
-    public static Item token(String tokenType) {
+    public static TokenItem token(String tokenType) {
         return token(tokenType, false, false);
+    }
+
+    public static TokenItem token() {
+        return token(null, false, false);
     }
 
     public static Iterable<Item> items(Item ...items) {
