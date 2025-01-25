@@ -1,16 +1,16 @@
 package org.vinniks.parsla.tokenizer;
 
-import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 
+@Value
 @RequiredArgsConstructor
-@Getter
 public class Token {
     @NonNull
-    private final String type;
+    String type;
 
-    private final String value;
+    String value;
 
     public Token(String type) {
         this(type, null);
