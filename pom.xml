@@ -28,8 +28,8 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/svinniks/parsla.git</connection>
-        <developerConnection>scm:git:ssh://github.com:svinniks/parsla.git</developerConnection>
+        <connection>scm:git:https://github.com/svinniks/parsla.git</connection>
+        <developerConnection>scm:git:https://github.com:svinniks/parsla.git</developerConnection>
         <url>http://github.com/svinniks/parsla/tree/master</url>
     </scm>
 
