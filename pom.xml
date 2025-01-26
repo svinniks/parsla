@@ -30,7 +30,7 @@
     <scm>
         <connection>scm:git:https://github.com/svinniks/parsla.git</connection>
         <developerConnection>scm:git:git@github.com:svinniks/parsla.git</developerConnection>
-        <url>http://github.com/svinniks/parsla/tree/master</url>
+        <url>https://github.com/svinniks/parsla/tree/master</url>
     </scm>
 
     <properties>
