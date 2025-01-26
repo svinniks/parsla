@@ -29,8 +29,8 @@
         <connection>scm:git:https://github.com/svinniks/parsla.git</connection>
         <developerConnection>scm:git:git@github.com:svinniks/parsla.git</developerConnection>
         <url>https://github.com/svinniks/parsla/tree/master</url>
-      <tag>HEAD</tag>
-  </scm>
+        <tag>HEAD</tag>
+    </scm>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
